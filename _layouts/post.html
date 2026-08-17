@@ -1,0 +1,15 @@
+---
+layout: default
+---
+
+<article class="post">
+  <h1 class="post-title">{{ page.title }}</h1>
+  <div class="post-meta" style="color: #666; margin-bottom: 20px;">
+    <span>📅 {{ page.date | date: "%B %d, %Y" }}</span> | 
+    <span>📌 {{ page.source }}</span>
+  </div>
+  <div class="post-content">
+    {{ content }}
+  </div>
+  <p><a href="{{ '/' | relative_url }}">← Back to All News</a></p>
+</article>

@@ -1,0 +1,34 @@
+name: Tri-Lingual Blog Automation Engine
+
+on:
+  schedule:
+    - cron: '0 3,9,15,21 * * *'
+  workflow_dispatch:
+
+jobs:
+  build-and-publish-blog:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: pip install -r requirements.txt
+
+      - name: Generate Multi-Lingual Blog Posts
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+        run: python main.py
+
+      - name: Commit and Push New Posts to GitHub Pages
+        run: |
+          git config --global user.name "Auto-News-Bot"
+          git config --global user.email "bot@news.local"
+          git add _posts/
+          git diff-index --quiet HEAD || git commit -m "Auto-published tri-lingual blog posts [skip ci]"
+          git push

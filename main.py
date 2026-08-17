@@ -10,11 +10,10 @@ from google import genai
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 if not GEMINI_API_KEY:
-    raise ValueError("❌ Missing GEMINI_API_KEY in Repository Secrets.")
+    print("❌ Critical Error: GEMINI_API_KEY environment variable is missing.")
+    exit(1)
 
 client = genai.Client(api_key=GEMINI_API_KEY)
-
-# High-priority reliable RSS sources across all 6 categories
 SOURCES = [
     # -------------------------------------------------------------
     # 1. GENERAL & NATIONAL NEWS (ETHIOPIA, AFRICA, GLOBAL)
@@ -242,9 +241,9 @@ SOURCES = [
 ]
 
 
-    async def fetch_single_feed(http_client, source):
+  async def fetch_single_feed(http_client, source):
     try:
-        response = await http_client.get(source["url"], timeout=5.0)
+        response = await http_client.get(source["url"], timeout=6.0)
         feed = feedparser.parse(response.content)
         items = []
         for entry in feed.entries[:2]:
@@ -255,7 +254,8 @@ SOURCES = [
                 "context": getattr(entry, 'summary', '')
             })
         return items
-    except Exception:
+    except Exception as e:
+        print(f"⚠️ Warning: Failed to fetch {source['name']}: {e}")
         return []
 
 async def fetch_all_feeds():
@@ -296,30 +296,31 @@ Return ONLY a raw JSON array of objects without markdown backticks or commentary
 ]
 """
 
-    models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
+    models_to_try = ["gemini-1.5-flash", "gemini-1.5-pro"]
 
     for model_name in models_to_try:
         try:
-            print(f"Executing generation with {model_name}...")
+            print(f"Attempting API call with model: {model_name}...")
             response = client.models.generate_content(
                 model=model_name,
                 contents=prompt
             )
             raw_text = response.text.strip()
             
-            if raw_text.startswith("```"):
+            if "```" in raw_text:
                 raw_text = raw_text.split("```")[1]
                 if raw_text.startswith("json"):
                     raw_text = raw_text[4:]
             
             clean_json = raw_text.strip()
             articles = json.loads(clean_json)
-            print(f"SUCCESS: Generated {len(articles)} multi-lingual stories!")
+            print(f"✅ SUCCESS: Generated {len(articles)} multi-lingual stories!")
             return articles
         except Exception as e:
-            print(f"⚠️ Model {model_name} failed: {e}")
+            print(f"⚠️ Model {model_name} execution error: {e}")
             time.sleep(1)
 
+    print("❌ Error: All Gemini generation attempts failed.")
     return []
 
 def save_markdown_posts(articles):
@@ -330,7 +331,7 @@ def save_markdown_posts(articles):
         cat = article.get("category", "general")
         source = article.get("source_name", "News")
 
-        # 1. Save Amharic Post (_posts/am/)
+        # 1. Save Amharic Post
         am_dir = "_posts/am"
         os.makedirs(am_dir, exist_ok=True)
         am_file = f"{am_dir}/{today}-{cat}-{timestamp}-{idx}.md"
@@ -338,7 +339,7 @@ def save_markdown_posts(articles):
         with open(am_file, "w", encoding="utf-8") as f:
             f.write(am_meta)
 
-        # 2. Save Afaan Oromoo Post (_posts/om/)
+        # 2. Save Afaan Oromoo Post
         om_dir = "_posts/om"
         os.makedirs(om_dir, exist_ok=True)
         om_file = f"{om_dir}/{today}-{cat}-{timestamp}-{idx}.md"
@@ -346,7 +347,7 @@ def save_markdown_posts(articles):
         with open(om_file, "w", encoding="utf-8") as f:
             f.write(om_meta)
 
-        # 3. Save English Post (_posts/en/)
+        # 3. Save English Post
         en_dir = "_posts/en"
         os.makedirs(en_dir, exist_ok=True)
         en_file = f"{en_dir}/{today}-{cat}-{timestamp}-{idx}.md"
@@ -354,17 +355,24 @@ def save_markdown_posts(articles):
         with open(en_file, "w", encoding="utf-8") as f:
             f.write(en_meta)
 
-    print(f"✅ Generated {len(articles) * 3} post files across AM, OM, and EN!")
+    print(f"✅ Generated and committed {len(articles) * 3} post files!")
 
 async def main():
-    raw_news = await fetch_all_feeds()
-    if not raw_news:
-        print("❌ No news items fetched.")
-        return
-    
-    articles = generate_tri_lingual_articles(raw_news)
-    if articles:
-        save_markdown_posts(articles)
+    try:
+        print("Starting feed collection...")
+        raw_news = await fetch_all_feeds()
+        if not raw_news:
+            print("❌ No news items fetched from feeds.")
+            return
+        
+        print(f"Collected {len(raw_news)} raw news snippets. Generating articles...")
+        articles = generate_tri_lingual_articles(raw_news)
+        if articles:
+            save_markdown_posts(articles)
+        else:
+            print("⚠️ Article array empty. Skipping file creation.")
+    except Exception as general_error:
+        print(f"❌ Unhandled execution error: {general_error}")
 
 if __name__ == "__main__":
     asyncio.run(main())

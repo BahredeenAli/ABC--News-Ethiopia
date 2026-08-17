@@ -1,1 +1,22 @@
+title: "ABC News Ethiopia / Oduu Biyyooleessaa & Addunyaa"
+description: "Tri-Lingual News Platform (Amharic, Afaan Oromoo & English)"
+theme: minima
 
+permalink: /:lang/:categories/:year/:month/:day/:title/
+
+defaults:
+  - scope:
+      path: "_posts/am"
+    values:
+      layout: "post"
+      lang: "am"
+  - scope:
+      path: "_posts/om"
+    values:
+      layout: "post"
+      lang: "om"
+  - scope:
+      path: "_posts/en"
+    values:
+      layout: "post"
+      lang: "en"

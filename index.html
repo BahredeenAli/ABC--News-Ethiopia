@@ -1,0 +1,49 @@
+---
+layout: default
+---
+
+<div class="site-header-custom">
+  <h1>ABC News Ethiopia</h1>
+  <p>Tri-Lingual Automated News Platform</p>
+  
+  <!-- Language Selector Tabs -->
+  <div class="lang-switch">
+    <button onclick="filterLang('am')" class="lang-btn active" id="btn-am">አማርኛ</button>
+    <button onclick="filterLang('om')" class="lang-btn" id="btn-om">Afaan Oromoo</button>
+    <button onclick="filterLang('en')" class="lang-btn" id="btn-en">English</button>
+  </div>
+</div>
+
+<hr>
+
+<div class="posts-container">
+  {% for post in site.posts %}
+    <article class="post-card lang-{{ post.lang }}" style="{% if post.lang != 'am' %}display:none;{% endif %} margin-bottom: 25px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
+      <span class="badge" style="background:#0066cc; color:#fff; padding:3px 8px; border-radius:4px; font-size:12px; text-transform:uppercase;">{{ post.categories | join: ", " }}</span>
+      <h2 style="margin: 8px 0;"><a href="{{ post.url | relative_url }}">{{ post.title }}</a></h2>
+      <p style="color: #666; font-size: 14px;">📅 {{ post.date | date: "%b %d, %Y" }} | 📌 {{ post.source }}</p>
+    </article>
+  {% endfor %}
+</div>
+
+<script>
+function filterLang(lang) {
+  // Hide all posts
+  const posts = document.querySelectorAll('.post-card');
+  posts.forEach(post => post.style.display = 'none');
+
+  // Show selected language posts
+  const selectedPosts = document.querySelectorAll('.lang-' + lang);
+  selectedPosts.forEach(post => post.style.display = 'block');
+
+  // Update active button state
+  document.querySelectorAll('.lang-btn').forEach(btn => btn.classList.remove('active'));
+  document.getElementById('btn-' + lang).classList.add('active');
+}
+</script>
+
+<style>
+.lang-switch { margin: 15px 0; }
+.lang-btn { padding: 8px 16px; margin-right: 5px; cursor: pointer; border: 1px solid #0066cc; background: #fff; color: #0066cc; border-radius: 4px; font-weight: bold; }
+.lang-btn.active { background: #0066cc; color: #fff; }
+</style>

@@ -7,15 +7,14 @@ import json
 from datetime import datetime
 from google import genai
 
-# Retrieve credentials securely from GitHub Repository Secrets
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 if not GEMINI_API_KEY:
-    raise ValueError("❌ GEMINI_API_KEY environment variable is missing. Add it to GitHub Repository Secrets.")
+    raise ValueError("❌ Missing GEMINI_API_KEY in Repository Secrets.")
 
 client = genai.Client(api_key=GEMINI_API_KEY)
 
-# Comprehensive news source repository covering all requested entities
+# High-priority reliable RSS sources across all 6 categories
 SOURCES = [
     # -------------------------------------------------------------
     # 1. GENERAL & NATIONAL NEWS (ETHIOPIA, AFRICA, GLOBAL)
@@ -242,19 +241,18 @@ SOURCES = [
     {"category": "oddities", "name": "SoraNews24 Japan", "url": "https://soranews24.com/feed/"}
 ]
 
-async def fetch_single_feed(http_client, source):
+
+    async def fetch_single_feed(http_client, source):
     try:
-        response = await http_client.get(source["url"], timeout=6.0)
+        response = await http_client.get(source["url"], timeout=5.0)
         feed = feedparser.parse(response.content)
         items = []
         for entry in feed.entries[:2]:
-            title = getattr(entry, 'title', '')
-            summary = getattr(entry, 'summary', '')
             items.append({
                 "category": source["category"],
                 "source": source["name"],
-                "headline": title,
-                "context": summary
+                "headline": getattr(entry, 'title', ''),
+                "context": getattr(entry, 'summary', '')
             })
         return items
     except Exception:
@@ -270,21 +268,14 @@ def generate_tri_lingual_articles(raw_items):
     combined_raw_text = json.dumps(raw_items, ensure_ascii=False, indent=2)
     
     prompt = f"""
-You are the Chief Foreign Editor for a multi-lingual news agency operating in Ethiopia and East Africa.
-Below is raw news data collected from national, continental, and international outlets across 6 categories (general, sports, tech, business, lifestyle, oddities):
+You are the Chief Editor for a tri-lingual news network.
+Select the top 1 news event for EACH category (general, sports, tech, business, lifestyle, oddities) from the raw data below:
 
 {combined_raw_text}
 
-MANDATORY INSTRUCTIONS:
-1. Select 1 top story for EACH available category (up to 6 stories total).
-2. For EVERY selected story, write a FULL, EXTENSIVE, LONG-FORM JOURNALISTIC ARTICLE in THREE LANGUAGES:
-   - Amharic (AM)
-   - Afaan Oromoo (OM)
-   - English (EN)
-3. Each article MUST contain at least 2 to 3 detailed paragraphs covering the event, background context, and implications.
-4. Output ONLY a valid JSON array of objects without surrounding Markdown backticks or commentary.
+For each selected story, write complete long-form detailed articles in Amharic (AM), Afaan Oromoo (OM), and English (EN).
+Return ONLY a raw JSON array of objects without markdown backticks or commentary. Format exact schema:
 
-JSON Output Schema:
 [
   {{
     "category": "general|sports|tech|business|lifestyle|oddities",
@@ -309,7 +300,7 @@ JSON Output Schema:
 
     for model_name in models_to_try:
         try:
-            print(f"Generating tri-lingual articles with {model_name}...")
+            print(f"Executing generation with {model_name}...")
             response = client.models.generate_content(
                 model=model_name,
                 contents=prompt
@@ -326,10 +317,9 @@ JSON Output Schema:
             print(f"SUCCESS: Generated {len(articles)} multi-lingual stories!")
             return articles
         except Exception as e:
-            print(f"⚠️ Model {model_name} attempt failed: {e}")
+            print(f"⚠️ Model {model_name} failed: {e}")
             time.sleep(1)
 
-    print("❌ All generation attempts failed.")
     return []
 
 def save_markdown_posts(articles):
@@ -340,7 +330,7 @@ def save_markdown_posts(articles):
         cat = article.get("category", "general")
         source = article.get("source_name", "News")
 
-        # 1. Save Amharic Article (_posts/am/)
+        # 1. Save Amharic Post (_posts/am/)
         am_dir = "_posts/am"
         os.makedirs(am_dir, exist_ok=True)
         am_file = f"{am_dir}/{today}-{cat}-{timestamp}-{idx}.md"
@@ -348,7 +338,7 @@ def save_markdown_posts(articles):
         with open(am_file, "w", encoding="utf-8") as f:
             f.write(am_meta)
 
-        # 2. Save Afaan Oromoo Article (_posts/om/)
+        # 2. Save Afaan Oromoo Post (_posts/om/)
         om_dir = "_posts/om"
         os.makedirs(om_dir, exist_ok=True)
         om_file = f"{om_dir}/{today}-{cat}-{timestamp}-{idx}.md"
@@ -356,7 +346,7 @@ def save_markdown_posts(articles):
         with open(om_file, "w", encoding="utf-8") as f:
             f.write(om_meta)
 
-        # 3. Save English Article (_posts/en/)
+        # 3. Save English Post (_posts/en/)
         en_dir = "_posts/en"
         os.makedirs(en_dir, exist_ok=True)
         en_file = f"{en_dir}/{today}-{cat}-{timestamp}-{idx}.md"
@@ -364,21 +354,17 @@ def save_markdown_posts(articles):
         with open(en_file, "w", encoding="utf-8") as f:
             f.write(en_meta)
 
-    print(f"✅ Saved {len(articles) * 3} Markdown post files across AM, OM, and EN!")
+    print(f"✅ Generated {len(articles) * 3} post files across AM, OM, and EN!")
 
 async def main():
-    print("Fetching feeds across all defined categories...")
     raw_news = await fetch_all_feeds()
     if not raw_news:
-        print("❌ No news items fetched from feeds.")
+        print("❌ No news items fetched.")
         return
     
-    print(f"Collected {len(raw_news)} raw items. Processing with Gemini...")
     articles = generate_tri_lingual_articles(raw_news)
     if articles:
         save_markdown_posts(articles)
-    else:
-        print("❌ Article generation returned empty list.")
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -12,38 +12,19 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=GEMINI_API_KEY)
 
 SOURCES = [
-    # 1. General News
     {"category": "general", "name": "ENA", "url": "https://www.ena.et/web/eng/rss"},
-    {"category": "general", "name": "Addis Standard", "url": "https://addisstandard.com/feed/"},
     {"category": "general", "name": "BBC News", "url": "https://feeds.bbci.co.uk/news/world/rss.xml"},
     {"category": "general", "name": "Reuters", "url": "https://www.reutersagency.com/feed/?best-topics=world&post_type=best"},
-
-    # 2. Sports
-    {"category": "sports", "name": "Soccer Ethiopia", "url": "https://soccerethiopia.net/feed/"},
-    {"category": "sports", "name": "CAF Online", "url": "https://news.google.com/rss/search?q=site:cafonline.com"},
     {"category": "sports", "name": "BBC Sport Africa", "url": "https://feeds.bbci.co.uk/sport/africa/rss.xml"},
-
-    # 3. Tech & Innovation
-    {"category": "tech", "name": "Shega.co", "url": "https://shega.co/feed/"},
-    {"category": "tech", "name": "TechCabal", "url": "https://techcabal.com/feed/"},
     {"category": "tech", "name": "TechCrunch", "url": "https://techcrunch.com/feed/"},
-
-    # 4. Business & Economy
-    {"category": "business", "name": "Addis Fortune", "url": "https://addisfortune.news/feed/"},
     {"category": "business", "name": "Business Daily Africa", "url": "https://www.businessdailyafrica.com/service/rss/bda/2046/feed.rss"},
-
-    # 5. Lifestyle & Entertainment
-    {"category": "lifestyle", "name": "LinkUp Addis", "url": "https://rsshub.app/telegram/channel/linkupaddis"},
     {"category": "lifestyle", "name": "BellaNaija", "url": "https://www.bellanaija.com/feed/"},
-
-    # 6. Odd & Offbeat News
-    {"category": "oddities", "name": "Oddity Central", "url": "https://www.odditycentral.com/feed"},
-    {"category": "oddities", "name": "Reddit r/NotTheOnion", "url": "https://www.reddit.com/r/nottheonion/top/.rss?sort=top&t=day"}
+    {"category": "oddities", "name": "Oddity Central", "url": "https://www.odditycentral.com/feed"}
 ]
 
 async def fetch_single_feed(http_client, source):
     try:
-        response = await http_client.get(source["url"], timeout=5.0)
+        response = await http_client.get(source["url"], timeout=6.0)
         feed = feedparser.parse(response.content)
         items = []
         for entry in feed.entries[:2]:
@@ -54,7 +35,8 @@ async def fetch_single_feed(http_client, source):
                 "context": getattr(entry, 'summary', '')
             })
         return items
-    except Exception:
+    except Exception as e:
+        print(f"Error fetching {source['name']}: {e}")
         return []
 
 async def fetch_all_feeds():
@@ -68,12 +50,12 @@ def generate_tri_lingual_articles(raw_items):
     
     prompt = f"""
 You are the Chief Editor for a tri-lingual news platform.
-Select the top 1 news event for EACH category (general, sports, tech, business, lifestyle, oddities) from the raw data below:
+Select 1 key story from the raw news items below:
 
 {combined_raw_text}
 
-For each selected story, write complete long-form news reports in Amharic, Afaan Oromoo, and English.
-Return structured output adhering strictly to the JSON Schema provided.
+Write complete detailed news reports in Amharic, Afaan Oromoo, and English.
+Return a structured JSON list of objects matching the required schema.
 """
 
     response_schema = {
@@ -112,24 +94,20 @@ Return structured output adhering strictly to the JSON Schema provided.
         }
     }
 
-    models_to_try = ["gemini-2.5-flash", "gemini-2.0-flash"]
-
-    for model in models_to_try:
-        try:
-            response = client.models.generate_content(
-                model=model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    response_schema=response_schema
-                )
+    # Use correct Gemini model name
+    try:
+        response = client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_schema=response_schema
             )
-            return json.loads(response.text)
-        except Exception as e:
-            print(f"⚠️ Generation failed using {model}: {e}")
-            time.sleep(2)
-
-    return []
+        )
+        return json.loads(response.text)
+    except Exception as e:
+        print(f"❌ Gemini Generation Failed: {e}")
+        return []
 
 def save_markdown_posts(articles):
     today = datetime.now().strftime("%Y-%m-%d")
@@ -168,14 +146,14 @@ def save_markdown_posts(articles):
 async def main():
     raw_news = await fetch_all_feeds()
     if not raw_news:
-        print("❌ No raw news items retrieved.")
+        print("❌ No news items fetched.")
         return
     
     articles = generate_tri_lingual_articles(raw_news)
     if articles:
         save_markdown_posts(articles)
     else:
-        print("❌ Generation failed or returned empty payload.")
+        print("❌ Article generation failed.")
 
 if __name__ == "__main__":
     asyncio.run(main())

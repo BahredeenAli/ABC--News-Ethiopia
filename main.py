@@ -67,16 +67,15 @@ def generate_tri_lingual_articles(raw_items):
     combined_raw_text = json.dumps(raw_items, ensure_ascii=False, indent=2)
     
     prompt = f"""
-You are the Chief Editor for a tri-lingual news network.
-Select the top 1 most important story for EACH category (general, sports, tech, business, lifestyle, oddities) from the raw news feed data below:
+You are the Chief Editor for a tri-lingual news platform.
+Select the top 1 news event for EACH category (general, sports, tech, business, lifestyle, oddities) from the raw data below:
 
 {combined_raw_text}
 
-For each story, write long-form detailed articles in Amharic, Afaan Oromoo, and English.
-Return structured JSON output matching the required schema.
+For each selected story, write complete long-form news reports in Amharic, Afaan Oromoo, and English.
+Return structured output adhering strictly to the JSON Schema provided.
 """
 
-    # Schema definition forces valid JSON response
     response_schema = {
         "type": "ARRAY",
         "items": {
@@ -127,7 +126,7 @@ Return structured JSON output matching the required schema.
             )
             return json.loads(response.text)
         except Exception as e:
-            print(f"⚠️ Generation failed with {model}: {e}")
+            print(f"⚠️ Generation failed using {model}: {e}")
             time.sleep(2)
 
     return []
@@ -140,7 +139,7 @@ def save_markdown_posts(articles):
         cat = article["category"]
         source = article["source_name"]
 
-        # 1. Save Amharic Post
+        # 1. Save Amharic Article
         am_dir = "_posts/am"
         os.makedirs(am_dir, exist_ok=True)
         am_file = f"{am_dir}/{today}-{cat}-{timestamp}-{idx}.md"
@@ -148,7 +147,7 @@ def save_markdown_posts(articles):
         with open(am_file, "w", encoding="utf-8") as f:
             f.write(am_meta)
 
-        # 2. Save Afaan Oromoo Post
+        # 2. Save Afaan Oromoo Article
         om_dir = "_posts/om"
         os.makedirs(om_dir, exist_ok=True)
         om_file = f"{om_dir}/{today}-{cat}-{timestamp}-{idx}.md"
@@ -156,7 +155,7 @@ def save_markdown_posts(articles):
         with open(om_file, "w", encoding="utf-8") as f:
             f.write(om_meta)
 
-        # 3. Save English Post
+        # 3. Save English Article
         en_dir = "_posts/en"
         os.makedirs(en_dir, exist_ok=True)
         en_file = f"{en_dir}/{today}-{cat}-{timestamp}-{idx}.md"
@@ -164,19 +163,19 @@ def save_markdown_posts(articles):
         with open(en_file, "w", encoding="utf-8") as f:
             f.write(en_meta)
 
-    print(f"✅ Generated and committed {len(articles) * 3} post files!")
+    print(f"✅ Generated and saved {len(articles) * 3} post files!")
 
 async def main():
     raw_news = await fetch_all_feeds()
     if not raw_news:
-        print("❌ No news items fetched.")
+        print("❌ No raw news items retrieved.")
         return
     
     articles = generate_tri_lingual_articles(raw_news)
     if articles:
         save_markdown_posts(articles)
     else:
-        print("❌ Article generation returned empty list.")
+        print("❌ Generation failed or returned empty payload.")
 
 if __name__ == "__main__":
     asyncio.run(main())

@@ -2,6 +2,12 @@ title: "ABC News Ethiopia / Oduu Biyyooleessaa & Addunyaa"
 description: "Tri-Lingual News Platform (Amharic, Afaan Oromoo & English)"
 theme: minima
 
+# Force Jekyll to include nested language subdirectories inside _posts
+include:
+  - _posts/am
+  - _posts/om
+  - _posts/en
+
 permalink: /:lang/:categories/:year/:month/:day/:title/
 
 defaults:
